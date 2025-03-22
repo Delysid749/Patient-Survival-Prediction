@@ -33,7 +33,7 @@ env/
 *.code-workspace
 
 # Ignore data and output files in the 'data2017' directory
-data/*
+dataSet/*
 
 # Ignore specific output directories
 output/
