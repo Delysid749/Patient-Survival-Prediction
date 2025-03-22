@@ -1,0 +1,14 @@
+from pathlib import Path
+
+# 项目根目录
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# 数据路径
+DATA_DIR = BASE_DIR / 'dataSet'
+DATA_FILE = DATA_DIR / 'dataset.csv'
+
+# 报告路径
+REPORT_DIR = BASE_DIR / 'report'
+LOG_DIR = REPORT_DIR / 'logs'
+
+
