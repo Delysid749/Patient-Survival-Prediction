@@ -1,3 +1,7 @@
+"""
+定义全局变量数组
+"""
+
 numerical_array = ['encounter_id', 'patient_id', 'hospital_id', 'age', 'bmi', 'elective_surgery', 'height', 'icu_id',
                    'pre_icu_los_days',
                    'weight', 'apache_2_diagnosis', 'apache_3j_diagnosis', 'apache_post_operative', 'arf_apache',

@@ -1,5 +1,9 @@
 from pathlib import Path
 
+"""
+定义全局路径
+"""
+
 # 项目根目录
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 

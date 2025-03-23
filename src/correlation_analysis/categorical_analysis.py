@@ -4,6 +4,9 @@ import pandas as pd
 from scipy.stats import chi2_contingency
 import os
 
+"""
+使用卡方检验，检验每个分类变量与target - hospital_death的相关性
+"""
 def analyze_categorical_correlation(df, target='hospital_death'):
     results = []
 

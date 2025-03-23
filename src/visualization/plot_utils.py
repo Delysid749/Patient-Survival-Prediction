@@ -3,6 +3,9 @@ import seaborn as sns
 from sklearn.metrics import roc_curve, confusion_matrix
 import pandas as pd
 
+"""
+定义AUC、ROC曲線、混淆矩阵的绘制函数
+"""
 def plot_roc_curve(y_true, y_score, save_path):
     fpr, tpr, _ = roc_curve(y_true, y_score)
     plt.figure()

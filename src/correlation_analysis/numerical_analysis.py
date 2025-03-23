@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 from src.common.variable_array import numerical_array
 from src.config.path_config import DATA_FILE,LOG_DIR
 import os
+
+"""
+使用pearson系数检验每个数值型变量与target - hospital_death 的相关性
+"""
 def analyze_numerical_correlation(df, target='hospital_death', threshold=0.05, save_path=None):
     """
     分析所有数值型变量与目标变量之间的皮尔逊相关系数，并筛选出高于阈值的特征。
