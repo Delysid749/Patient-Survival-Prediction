@@ -11,4 +11,8 @@ DATA_FILE = DATA_DIR / 'dataset.csv'
 REPORT_DIR = BASE_DIR / 'report'
 LOG_DIR = REPORT_DIR / 'logs'
 
-
+# 图表可视化路径
+VIS_DIR = BASE_DIR / 'src/visualization'
+LR_VIS_DIR = VIS_DIR / 'LogisticRegression'
+DNN_VIS_DIR = VIS_DIR / 'DNN'
+XG_VIS_DIR = VIS_DIR / 'XgBoost'
