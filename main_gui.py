@@ -39,30 +39,20 @@ frame = ttk.Frame(root, padding="10")
 frame.pack(padx=20, pady=20)
 
 for feature in top_features:
-    # 为每个特征创建标签
     label = ttk.Label(frame, text=feature, font=("Helvetica", 10), anchor="w")
     label.grid(row=top_features.index(feature), column=0, pady=5, sticky="w")
-
-    # 为每个特征创建输入框
     entry = ttk.Entry(frame, width=25, font=("Helvetica", 10))
     entry.grid(row=top_features.index(feature), column=1, pady=5)
     entries[feature] = entry
 
-
-# 定义预测函数
 def predict():
     input_data = {}
-
-    # 获取用户输入的数据
     for feature in top_features:
         value = entries[feature].get()
         if value:
             input_data[feature] = value
         else:
-            # 如果输入为空，则用众数代替
-            input_data[feature] = data[feature].mode()[0]  # 使用训练数据中的众数
-
-    # 补齐所有模型需要的特征
+            input_data[feature] = data[feature].mode()[0]
     all_features = ['age', 'bmi', 'elective_surgery', 'ethnicity',
                     'gender', 'height', 'icu_admit_source', 'icu_stay_type', 'icu_type', 'pre_icu_los_days',
                     'weight', 'apache_2_diagnosis', 'apache_3j_diagnosis', 'apache_post_operative', 'arf_apache',
@@ -87,19 +77,12 @@ def predict():
                     'apache_4a_icu_death_prob',
                     'aids', 'cirrhosis', 'diabetes_mellitus', 'hepatic_failure', 'immunosuppression', 'leukemia',
                     'lymphoma', 'solid_tumor_with_metastasis', 'apache_3j_bodysystem', 'apache_2_bodysystem']
-
-    # 填补所有缺失的特征（包括非用户输入的特征），用众数填补
     for feature in all_features:
-        if feature not in input_data:  # 如果用户没有提供该特征
-            input_data[feature] = data[feature].mode()[0]  # 用训练数据中的众数填充
-
-    # 转换输入数据为DataFrame
+        if feature not in input_data:
+            input_data[feature] = data[feature].mode()[0]
     input_df = pd.DataFrame([input_data])
-
     prediction = load_pipeline.predict(input_df)
     prediction_proba = load_pipeline.predict_proba(input_df)[:, 1]
-
-    # 显示预测结果
     result = "Death" if prediction[0] == 1 else "Survival"
     prob = prediction_proba[0]
     messagebox.showinfo("Prediction Result", f"Predicted Outcome: {result}\nProbability: {prob:.2f}")
