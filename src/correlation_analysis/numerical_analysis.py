@@ -1,7 +1,7 @@
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from src.common.variable_array import numerical_array  # 引入你定义的变量列表
+from src.common.variable_array import numerical_array
 from src.config.path_config import DATA_FILE,LOG_DIR
 import os
 def analyze_numerical_correlation(df, target='hospital_death', threshold=0.05, save_path=None):
@@ -15,8 +15,8 @@ def analyze_numerical_correlation(df, target='hospital_death', threshold=0.05, s
         save_path: str，可选，若提供则保存热力图
 
     返回:
-        strong_corr_features: list，相关性大于阈值的变量名
-        corr_series: Series，全部变量与目标的相关性排序
+        strong_corr_features: list，相关性大于阈值的数值型变量名
+        corr_series: Series，全部数值型变量与目标的相关性排序
     """
     # 取出数值型变量 + 目标变量的子集
     corr_df = df[numerical_array].copy()
@@ -31,7 +31,7 @@ def analyze_numerical_correlation(df, target='hospital_death', threshold=0.05, s
     corr_series = corr_matrix[target].drop(target).abs().sort_values(ascending=False)
 
     # 输出所有相关性
-    print("各变量与 hospital_death 的皮尔逊相关系数：")
+    print("各数值型变量与 hospital_death 的皮尔逊相关系数：")
     print(corr_series)
 
     # 提取与目标变量的相关性（保留正负号）
@@ -54,11 +54,11 @@ def save_correlation_to_log(corr_series, selected_features, log_path=LOG_DIR / "
         for feature, corr in corr_series.items():
             f.write(f"{feature:35s} {corr:.4f}\n")
 
-        f.write(f"\n筛选出的相关性 > 阈值{threshold} 的变量：\n")
+        f.write(f"\n筛选出的相关性 > 阈值{threshold} 的数值型变量：\n")
         for feature in selected_features:
             f.write(f"{feature}\n")
 
-        f.write(f"\n低于阈值{threshold}（被剔除）的变量：\n")
+        f.write(f"\n低于阈值{threshold}（被剔除）的数值型变量：\n")
         for feature, corr in corr_series.items():
             if abs(corr) <= threshold:
                 f.write(f"{feature:35s} {corr:.4f}\n")
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     df = pd.read_csv(DATA_FILE)
     selected_features, correlation_scores = analyze_numerical_correlation(df, threshold=0.05)
     save_correlation_to_log(correlation_scores, selected_features)
-    print(f"\n被剔除的低相关性变量（相关性 ≤ 阈值{0.05}）:")
+    print(f"\n被剔除的低相关性数值型数值型变量（相关性 ≤ 阈值{0.05}）:")
     for feature, corr in correlation_scores.items():
         if abs(corr) <= 0.05:
             print(f"{feature:35s} {corr:.4f}")
