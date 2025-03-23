@@ -1,117 +1,117 @@
-# 导入所需的库
+# LogisticRegression.py
 import pandas as pd
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.linear_model import LogisticRegression, LinearRegression
-from src.common.variable_array import final_numerical_arr, categorical_array
-from src.config.path_config import DATA_FILE, LOG_DIR, LR_VIS_DIR
-from sklearn.metrics import classification_report, roc_auc_score, roc_curve,confusion_matrix
-from sklearn.feature_selection import SelectKBest, f_classif,chi2
-import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.linear_model import LogisticRegression
+from sklearn.feature_selection import SelectKBest, f_classif, chi2
 
+from src.common.variable_array import final_numerical_arr, categorical_array
+import os
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
+from src.config.path_config import DATA_FILE, LR_VIS_DIR
 from src.visualization.plot_utils import (
     plot_roc_curve,
     plot_confusion_matrix,
     plot_feature_importance
 )
+from src.common.variable_array import final_numerical_arr, categorical_array
 
 
-# 定义逻辑回归模型训练与验证函数
-def LogisticRegressionModel(df):
-    numeric_features = final_numerical_arr  # 数值特征
-    categorical_features = categorical_array  # 类别特征
-    # 数值型特征选择器
-    num_selector = SelectKBest(score_func=f_classif, k='all')
-    # 类别型特征选择器
-    cat_selector = SelectKBest(score_func=chi2, k='all')
+class LogisticModel(BaseEstimator, ClassifierMixin):
+    def __init__(self):
+        self.pipeline = None
 
-    # 数值型特征预处理管道：缺失值填充（中位数）+ 标准化
-    numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median')),  # 缺失值填充为中位数
-        ('scaler', StandardScaler()),  # 标准化处理
-        ('selector', num_selector)
-    ])
-
-    # 类别型特征预处理管道：缺失值填充为'missing' + 独热编码
-    categorical_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),  # 填充空值为'missing'
-        ('onehot', OneHotEncoder(handle_unknown='ignore')),  # 独热编码
-        ('selector', cat_selector)
-    ])
-
-    # 总的预处理器：将数值与类别特征的预处理组合起来
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', numeric_transformer, numeric_features),  # 数值特征处理方式
-            ('cat', categorical_transformer, categorical_features),  # 类别特征处理方式
+    def fit(self, X, y):
+        # 数值型特征预处理
+        numeric_transformer = Pipeline(steps=[
+            ('imputer', SimpleImputer(strategy='median')),
+            ('scaler', StandardScaler()),
+            ('selector', SelectKBest(score_func=f_classif, k='all'))
         ])
+        # 类别型特征预处理
+        categorical_transformer = Pipeline(steps=[
+            ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
+            ('onehot', OneHotEncoder(handle_unknown='ignore')),
+            ('selector', SelectKBest(score_func=chi2, k='all'))
+        ])
+        # 总预处理器
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ('num', numeric_transformer, final_numerical_arr),
+                ('cat', categorical_transformer, categorical_array)
+            ]
+        )
+        # 构建包含预处理器与逻辑回归模型的流水线
+        self.pipeline = Pipeline(steps=[
+            ('preprocessor', preprocessor),
+            ('model', LogisticRegression(max_iter=1000))
+        ])
+        self.pipeline.fit(X, y)
+        return self
 
-    # 定义完整模型管道：预处理器 + 逻辑回归分类器
-    model_pipeline = Pipeline(steps=[
-        ('preprocessor', preprocessor),  # 第一步：预处理
-        ('model', LogisticRegression(max_iter=1000))  # 第二步：训练逻辑回归模型
-    ])
+    def predict_proba(self, X):
+        return self.pipeline.predict_proba(X)
 
-    # 拆分特征与标签
-    X = df.drop(["hospital_death"], axis=1)  # 特征（删除目标变量列）
-    y = df['hospital_death']  # 目标变量（住院是否死亡）
+    def predict(self, X):
+        return self.pipeline.predict(X)
 
-    # 拆分训练集和验证集（80%训练，20%验证）
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.20, random_state=42)
-
-    # 模型拟合训练数据
-    model_pipeline.fit(X_train, y_train)
-
-    # 在验证集上打分（输出准确率）
-    accuracy = model_pipeline.score(X_val, y_val)
-
-    # 预测验证集的结果
-    y_pred = model_pipeline.predict(X_val)
-    y_pred_prob = model_pipeline.predict_proba(X_val)[:, 1]
-
-    # 打印模型名称与准确率
-    print("Model: LogisticRegression")
-    print("Accuracy:", accuracy)
-    print(classification_report(y_val, y_pred))
-    print("AUC-ROC:", roc_auc_score(y_val, y_pred_prob))
-
-    # 添加 5 折交叉验证
-    from sklearn.model_selection import cross_val_score
-    cv_auc_scores = cross_val_score(model_pipeline, X, y, cv=5, scoring='roc_auc')
-    print("5-Fold Cross-Validated AUC Scores:", cv_auc_scores)
-    print("Mean AUC from CV:", cv_auc_scores.mean())
-
-    plot_roc_curve(y_val, y_pred_prob, LR_VIS_DIR / "roc_curve.png")
-    print("ROC 曲线图已保存至：", LR_VIS_DIR / "roc_curve.png")
-
-    plot_confusion_matrix(y_val, y_pred, LR_VIS_DIR / "confusion_matrix.png")
-    print("混淆矩阵图已保存至：", LR_VIS_DIR / "confusion_matrix.png")
-
-    # 数值型特征重要性可视化
-    selector_num = model_pipeline.named_steps['preprocessor'] \
-        .named_transformers_['num'] \
-        .named_steps['selector']
-    scores_num = selector_num.scores_
-    plot_feature_importance(numeric_features, scores_num, LR_VIS_DIR / "num_feature_importance.png",10)
-    print("数值特征重要性图已保存至：", LR_VIS_DIR / "num_feature_importance.png")
-
-    # 分类特征重要性可视化
-    selector_cat = model_pipeline.named_steps['preprocessor'] \
-        .named_transformers_['cat'] \
-        .named_steps['selector']
-    encoder = model_pipeline.named_steps['preprocessor'] \
-        .named_transformers_['cat'] \
-        .named_steps['onehot']
-    cat_feature_names = encoder.get_feature_names_out(categorical_features)
-    scores_cat = selector_cat.scores_
-    plot_feature_importance(cat_feature_names, scores_cat, LR_VIS_DIR / "cat_feature_importance.png",10)
-    print("分类特征重要性图已保存至：", LR_VIS_DIR / "cat_feature_importance.png")
 
 if __name__ == '__main__':
     df = pd.read_csv(DATA_FILE)
+    X = df.drop("hospital_death", axis=1)
+    y = df["hospital_death"]
 
-    LogisticRegressionModel(df)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+
+    # 2. 初始化并训练模型
+    model = LogisticModel()
+    print("开始训练逻辑回归模型...")
+    model.fit(X_train, y_train)
+
+    # 3. 模型预测
+    y_pred = model.predict(X_test)
+    y_prob = model.predict_proba(X_test)[:, 1]
+
+    # 4. 评估输出
+    print("准确率:", accuracy_score(y_test, y_pred))
+    print("分类报告:")
+    print(classification_report(y_test, y_pred))
+
+    # 5. 可视化目录与图像路径
+    os.makedirs(LR_VIS_DIR, exist_ok=True)
+    roc_path = os.path.join(LR_VIS_DIR, "lr_roc_curve.png")
+    cm_path = os.path.join(LR_VIS_DIR, "lr_confusion_matrix.png")
+    fi_path = os.path.join(LR_VIS_DIR, "lr_feature_importance.png")
+
+    # 6. 绘制 ROC 曲线 & 混淆矩阵
+    plot_roc_curve(y_test, y_prob, roc_path)
+    print(f"ROC 曲线已保存至：{roc_path}")
+
+    plot_confusion_matrix(y_test, y_pred, cm_path)
+    print(f"混淆矩阵图已保存至：{cm_path}")
+
+    # 7. 提取特征打分（包含 OneHot 后特征名）
+    print("提取特征重要性...")
+    selector_num = model.pipeline.named_steps['preprocessor'].named_transformers_['num'].named_steps['selector']
+    selector_cat = model.pipeline.named_steps['preprocessor'].named_transformers_['cat'].named_steps['selector']
+    encoder_cat = model.pipeline.named_steps['preprocessor'].named_transformers_['cat'].named_steps['onehot']
+
+    num_features = final_numerical_arr
+    num_scores = selector_num.scores_
+
+    cat_features = encoder_cat.get_feature_names_out(categorical_array).tolist()
+    cat_scores = selector_cat.scores_
+
+    all_features = num_features + cat_features
+    all_scores = np.concatenate([num_scores, cat_scores])
+
+    plot_feature_importance(all_features, all_scores, fi_path, top_k=20)
+    print(f"特征重要性图已保存至：{fi_path}")

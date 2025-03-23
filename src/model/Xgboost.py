@@ -1,14 +1,19 @@
-import pandas as pd
-from sklearn.model_selection import train_test_split, cross_val_score
+# Xgboost.py
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from xgboost import XGBClassifier
-from sklearn.metrics import classification_report, roc_auc_score
-from src.common.variable_array import final_numerical_arr, categorical_array
-from src.config.path_config import DATA_FILE, LOG_DIR, XG_VIS_DIR
 from sklearn.feature_selection import SelectKBest, f_classif, chi2
+
+from src.common.variable_array import final_numerical_arr, categorical_array
+import os
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
+from src.config.path_config import DATA_FILE, XG_VIS_DIR
 from src.visualization.plot_utils import (
     plot_roc_curve,
     plot_confusion_matrix,
@@ -16,88 +21,99 @@ from src.visualization.plot_utils import (
 )
 
 
-# 定义XGBoost模型训练与验证函数
-def XGBoostModel(df):
-    numeric_features = final_numerical_arr
-    categorical_features = categorical_array
+class XGBoostModel(BaseEstimator, ClassifierMixin):
+    def __init__(self):
+        self.pipeline = None
 
-    # 特征选择器
-    num_selector = SelectKBest(score_func=f_classif, k='all')
-    cat_selector = SelectKBest(score_func=chi2, k='all')
-
-    # 数值型特征预处理
-    numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median')),
-        ('selector', num_selector)
-    ])
-
-    # 类别型特征预处理
-    categorical_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
-        ('onehot', OneHotEncoder(handle_unknown='ignore')),
-        ('selector', cat_selector)
-    ])
-
-    # 总预处理器
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', numeric_transformer, numeric_features),
-            ('cat', categorical_transformer, categorical_features),
+    def fit(self, X, y):
+        # 数值型预处理
+        numeric_transformer = Pipeline(steps=[
+            ('imputer', SimpleImputer(strategy='median')),
+            ('selector', SelectKBest(score_func=f_classif, k='all'))
         ])
+        # 类别型预处理
+        categorical_transformer = Pipeline(steps=[
+            ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
+            ('onehot', OneHotEncoder(handle_unknown='ignore')),
+            ('selector', SelectKBest(score_func=chi2, k='all'))
+        ])
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ('num', numeric_transformer, final_numerical_arr),
+                ('cat', categorical_transformer, categorical_array)
+            ]
+        )
+        self.pipeline = Pipeline(steps=[
+            ('preprocessor', preprocessor),
+            ('model', XGBClassifier(eval_metric='logloss', n_estimators=100, max_depth=5, random_state=42))
+        ])
+        self.pipeline.fit(X, y)
+        return self
 
-    # 定义模型流水线
-    model_pipeline = Pipeline(steps=[
-        ('preprocessor', preprocessor),
-        ('model',
-         XGBClassifier(eval_metric='logloss', n_estimators=100, max_depth=5, random_state=42))
-    ])
+    def predict_proba(self, X):
+        return self.pipeline.predict_proba(X)
 
-    # 拆分数据
+    def predict(self, X):
+        return self.pipeline.predict(X)
+
+
+if __name__ == "__main__":
+    # 1. 加载数据
+    df = pd.read_csv(DATA_FILE)
     X = df.drop("hospital_death", axis=1)
     y = df["hospital_death"]
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # 模型训练
-    model_pipeline.fit(X_train, y_train)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
 
-    # 预测与评估
-    y_pred = model_pipeline.predict(X_val)
-    y_pred_prob = model_pipeline.predict_proba(X_val)[:, 1]
+    # 2. 初始化并训练模型
+    model = XGBoostModel()
+    print("开始训练 XGBoost 模型...")
+    model.fit(X_train, y_train)
 
-    print("Model: XGBoostClassifier")
-    print("Accuracy:", model_pipeline.score(X_val, y_val))
-    print(classification_report(y_val, y_pred))
-    print("AUC-ROC:", roc_auc_score(y_val, y_pred_prob))
+    # 3. 模型预测
+    y_pred = model.predict(X_test)
+    y_prob = model.predict_proba(X_test)[:, 1]
 
-    # 5折交叉验证
-    cv_auc_scores = cross_val_score(model_pipeline, X, y, cv=5, scoring='roc_auc')
-    print("5-Fold Cross-Validated AUC Scores:", cv_auc_scores)
-    print("Mean AUC from CV:", cv_auc_scores.mean())
+    # 4. 评估
+    print("准确率:", accuracy_score(y_test, y_pred))
+    print("分类报告:")
+    print(classification_report(y_test, y_pred))
 
-    # 可视化输出
-    plot_roc_curve(y_val, y_pred_prob, XG_VIS_DIR / "roc_curve.png")
-    print("ROC 曲线图已保存至：", XG_VIS_DIR / "roc_curve.png")
+    # 5. 可视化目录
+    os.makedirs(XG_VIS_DIR, exist_ok=True)
+    roc_path = os.path.join(XG_VIS_DIR, "xgb_roc_curve.png")
+    cm_path = os.path.join(XG_VIS_DIR, "xgb_confusion_matrix.png")
+    fi_path = os.path.join(XG_VIS_DIR, "xgb_feature_importance.png")
 
-    plot_confusion_matrix(y_val, y_pred, XG_VIS_DIR / "confusion_matrix.png")
-    print("混淆矩阵图已保存至：", XG_VIS_DIR / "confusion_matrix.png")
+    # 6. 绘制 ROC 曲线
+    plot_roc_curve(y_test, y_prob, roc_path)
+    print(f"ROC 曲线已保存至：{roc_path}")
 
-    # 特征重要性可视化
-    selector_num = model_pipeline.named_steps['preprocessor'].named_transformers_['num'].named_steps['selector']
-    scores_num = selector_num.scores_
-    plot_feature_importance(numeric_features, scores_num, XG_VIS_DIR / "num_feature_importance.png", 10)
-    print("数值特征重要性图已保存至：", XG_VIS_DIR / "num_feature_importance.png")
+    # 7. 绘制混淆矩阵
+    plot_confusion_matrix(y_test, y_pred, cm_path)
+    print(f"混淆矩阵图已保存至：{cm_path}")
 
-    selector_cat = model_pipeline.named_steps['preprocessor'].named_transformers_['cat'].named_steps['selector']
-    encoder = model_pipeline.named_steps['preprocessor'].named_transformers_['cat'].named_steps['onehot']
-    cat_feature_names = encoder.get_feature_names_out(categorical_features)
-    scores_cat = selector_cat.scores_
-    plot_feature_importance(cat_feature_names, scores_cat, XG_VIS_DIR / "cat_feature_importance.png", 10)
-    print("分类特征重要性图已保存至：", XG_VIS_DIR / "cat_feature_importance.png")
+    # 8. 提取 SelectKBest 分数进行特征可视化（重点）
+    print("提取特征重要性...")
+    # 提取预处理器中的 SelectKBest 分数
+    # 获取特征分数
+    selector_num = model.pipeline.named_steps['preprocessor'].named_transformers_['num'].named_steps['selector']
+    selector_cat = model.pipeline.named_steps['preprocessor'].named_transformers_['cat'].named_steps['selector']
+    encoder_cat = model.pipeline.named_steps['preprocessor'].named_transformers_['cat'].named_steps['onehot']
 
+    # 获取数值型特征名与打分
+    num_features = final_numerical_arr
+    num_scores = selector_num.scores_
 
+    # 获取 OneHot 展开后的类别型特征名与打分
+    cat_features = encoder_cat.get_feature_names_out(categorical_array).tolist()
+    cat_scores = selector_cat.scores_
 
+    # 拼接总特征与分数
+    all_features = num_features + cat_features
+    all_scores = np.concatenate([num_scores, cat_scores])
 
-
-if __name__ == '__main__':
-    df = pd.read_csv(DATA_FILE)
-    XGBoostModel(df)
+    plot_feature_importance(all_features, all_scores, fi_path, top_k=20)
+    print(f"特征重要性图已保存至：{fi_path}")
