@@ -111,7 +111,6 @@ def LogisticRegressionModel(df):
     plot_feature_importance(cat_feature_names, scores_cat, LR_VIS_DIR / "cat_feature_importance.png",10)
     print("分类特征重要性图已保存至：", LR_VIS_DIR / "cat_feature_importance.png")
 
-# 主程序入口
 if __name__ == '__main__':
     df = pd.read_csv(DATA_FILE)
 

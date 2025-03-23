@@ -36,7 +36,7 @@ def plot_feature_importance(features, scores, save_path, top_k=None):
     # 排序
     feature_scores = feature_scores.sort_values(by='Score', ascending=False)
 
-    # 只显示前 top_k 个特征（如果有传入）
+    # 只显示前 top_k 个特征
     if top_k is not None:
         feature_scores = feature_scores.head(top_k)
 
