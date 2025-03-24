@@ -21,3 +21,6 @@ LR_VIS_DIR = VIS_DIR / 'LogisticRegression'
 DNN_VIS_DIR = VIS_DIR / 'DNN'
 XG_VIS_DIR = VIS_DIR / 'XgBoost'
 EN_VIS_DIR = VIS_DIR / 'Ensemble'
+
+# 模型保存路径
+MODEL_DIR = BASE_DIR / 'Model'
