@@ -1,4 +1,6 @@
 # LogisticRegression.py
+from collections import defaultdict
+
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.pipeline import Pipeline
@@ -7,13 +9,13 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.feature_selection import SelectKBest, f_classif, chi2
-
+from sklearn.model_selection import StratifiedKFold
 from src.common.variable_array import final_numerical_arr, categorical_array
 import os
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report,roc_auc_score
 from src.config.path_config import DATA_FILE, LR_VIS_DIR
 from src.visualization.plot_utils import (
     plot_roc_curve,
@@ -63,55 +65,94 @@ class LogisticModel(BaseEstimator, ClassifierMixin):
 
 
 if __name__ == '__main__':
+    # 1. 读取数据
     df = pd.read_csv(DATA_FILE)
     X = df.drop("hospital_death", axis=1)
     y = df["hospital_death"]
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
-
-    # 2. 初始化并训练模型
-    model = LogisticModel()
-    print("开始训练逻辑回归模型...")
-    model.fit(X_train, y_train)
-
-    # 3. 模型预测
-    y_pred = model.predict(X_test)
-    y_prob = model.predict_proba(X_test)[:, 1]
-
-    # 4. 评估输出
-    print("准确率:", accuracy_score(y_test, y_pred))
-    print("分类报告:")
-    print(classification_report(y_test, y_pred))
-
-    # 5. 可视化目录与图像路径
+    # 2. 创建可视化输出目录
     os.makedirs(LR_VIS_DIR, exist_ok=True)
-    roc_path = os.path.join(LR_VIS_DIR, "lr_roc_curve.png")
-    cm_path = os.path.join(LR_VIS_DIR, "lr_confusion_matrix.png")
-    fi_path = os.path.join(LR_VIS_DIR, "lr_feature_importance.png")
 
-    # 6. 绘制 ROC 曲线 & 混淆矩阵
-    plot_roc_curve(y_test, y_prob, roc_path)
-    print(f"ROC 曲线已保存至：{roc_path}")
+    # 3. 初始化模型 & 交叉验证器
+    model = LogisticModel()
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
-    plot_confusion_matrix(y_test, y_pred, cm_path)
-    print(f"混淆矩阵图已保存至：{cm_path}")
+    # 4. 结果收集容器
+    accuracy_list = []
+    auc_list = []
+    all_y_true = []
+    all_y_pred = []
+    all_y_prob = []
 
-    # 7. 提取特征打分（包含 OneHot 后特征名）
-    print("提取特征重要性...")
-    selector_num = model.pipeline.named_steps['preprocessor'].named_transformers_['num'].named_steps['selector']
-    selector_cat = model.pipeline.named_steps['preprocessor'].named_transformers_['cat'].named_steps['selector']
-    encoder_cat = model.pipeline.named_steps['preprocessor'].named_transformers_['cat'].named_steps['onehot']
+    feature_score_dict = defaultdict(list)  # 保存每一折的特征分数
 
-    num_features = final_numerical_arr
-    num_scores = selector_num.scores_
+    fold = 1
+    for train_idx, test_idx in skf.split(X, y):
+        print(f"\n========== 第 {fold} 折训练 ==========")
+        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
-    cat_features = encoder_cat.get_feature_names_out(categorical_array).tolist()
-    cat_scores = selector_cat.scores_
+        # 训练模型
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+        y_prob = model.predict_proba(X_test)[:, 1]
 
-    all_features = num_features + cat_features
-    all_scores = np.concatenate([num_scores, cat_scores])
+        # 评估指标
+        acc = accuracy_score(y_test, y_pred)
+        auc = roc_auc_score(y_test, y_prob)
+        print(f"准确率：{acc:.4f}")
+        print(f"AUC值：{auc:.4f}")
+        print("分类报告：")
+        print(classification_report(y_test, y_pred))
 
-    plot_feature_importance(all_features, all_scores, fi_path, top_k=20)
-    print(f"特征重要性图已保存至：{fi_path}")
+        # 汇总预测结果
+        all_y_true.extend(y_test)
+        all_y_pred.extend(y_pred)
+        all_y_prob.extend(y_prob)
+
+        # 特征重要性收集
+        selector_num = model.pipeline.named_steps['preprocessor'].named_transformers_['num'].named_steps['selector']
+        selector_cat = model.pipeline.named_steps['preprocessor'].named_transformers_['cat'].named_steps['selector']
+        encoder_cat = model.pipeline.named_steps['preprocessor'].named_transformers_['cat'].named_steps['onehot']
+
+        num_features = final_numerical_arr
+        num_scores = selector_num.scores_
+
+        cat_features = encoder_cat.get_feature_names_out(categorical_array).tolist()
+        cat_scores = selector_cat.scores_
+
+        all_features = num_features + cat_features
+        all_scores = np.concatenate([num_scores, cat_scores])
+
+        for feat, score in zip(all_features, all_scores):
+            feature_score_dict[feat].append(score)
+
+        accuracy_list.append(acc)
+        auc_list.append(auc)
+        fold += 1
+
+    # 5. 汇总评估
+    print("\n========== 交叉验证汇总 ==========")
+    print(f"平均准确率: {np.mean(accuracy_list):.4f} ± {np.std(accuracy_list):.4f}")
+    print(f"平均 AUC: {np.mean(auc_list):.4f} ± {np.std(auc_list):.4f}")
+
+    # 6. 可视化：ROC曲线 + 混淆矩阵 + 特征重要性（平均）
+
+    roc_path = os.path.join(LR_VIS_DIR, "lr_mean_roc.png")
+    cm_path = os.path.join(LR_VIS_DIR, "lr_mean_cm.png")
+    fi_path = os.path.join(LR_VIS_DIR, "lr_mean_feature_importance.png")
+
+    plot_roc_curve(all_y_true, all_y_prob, roc_path)
+    plot_confusion_matrix(all_y_true, all_y_pred, cm_path)
+
+    # 平均特征重要性
+    avg_feature_scores = []
+    for feat in all_features:
+        avg_score = np.mean(feature_score_dict[feat])
+        avg_feature_scores.append(avg_score)
+
+    plot_feature_importance(all_features, avg_feature_scores, fi_path, top_k=20)
+
+    print(f"\n已保存平均 ROC 曲线至：{roc_path}")
+    print(f"已保存平均混淆矩阵至：{cm_path}")
+    print(f"已保存平均特征重要性图至：{fi_path}")

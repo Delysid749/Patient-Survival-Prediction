@@ -1,107 +1,102 @@
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split, KFold
+from sklearn.model_selection import StratifiedKFold, KFold
 from sklearn.linear_model import LogisticRegression
 from sklearn.base import clone
-from sklearn.metrics import accuracy_score, classification_report
-from src.config.path_config import DATA_FILE,LOG_DIR
+from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
+from src.config.path_config import DATA_FILE, LOG_DIR, EN_VIS_DIR
+from src.visualization.plot_utils import plot_roc_curve, plot_confusion_matrix
+from pathlib import Path
+
 # 导入重构后的模型
 from DNN import DNNModel
 from LogisticRegression import LogisticModel
 from Xgboost import XGBoostModel
 
-
-def get_oof_predictions(model, X, y, X_test, n_splits=5):
+def get_oof_predictions(model, X, y, X_val, n_splits=5):
     """
-    生成基模型的 Out-Of-Fold（OOF）预测，用于堆叠集成。
-
-    参数：
-        model: 基模型实例（需实现 fit 与 predict_proba 方法）
-        X: 训练特征（DataFrame）
-        y: 训练标签（Series）
-        X_test: 测试特征（DataFrame）
-        n_splits: KFold 折数
-
-    返回：
-        oof_train: 训练集上每个样本的正类预测概率，形状为 (n_samples, 1)
-        oof_test: 测试集上各折预测的均值，形状为 (n_samples, 1)
+    为一个基模型生成训练集的 OOF 和验证集的预测概率。
     """
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
     oof_train = np.zeros(X.shape[0])
-    oof_test = np.zeros((X_test.shape[0], n_splits))
+    oof_val_pred = np.zeros(X_val.shape[0])
 
-    for i, (train_idx, val_idx) in enumerate(kf.split(X)):
-        # 重新克隆模型，确保每一折独立训练
+    for train_idx, valid_idx in kf.split(X):
         instance = clone(model)
         X_train_fold = X.iloc[train_idx]
         y_train_fold = y.iloc[train_idx]
-        X_val_fold = X.iloc[val_idx]
+        X_valid_fold = X.iloc[valid_idx]
 
         instance.fit(X_train_fold, y_train_fold)
-        # 获取验证集预测的正类概率
-        oof_train[val_idx] = instance.predict_proba(X_val_fold)[:, 1]
-        # 测试集上预测
-        oof_test[:, i] = instance.predict_proba(X_test)[:, 1]
+        oof_train[valid_idx] = instance.predict_proba(X_valid_fold)[:, 1]
+        oof_val_pred += instance.predict_proba(X_val)[:, 1] / n_splits
 
-    # 对测试集预测取平均，形成稳定输出
-    oof_test_mean = oof_test.mean(axis=1)
-    return oof_train.reshape(-1, 1), oof_test_mean.reshape(-1, 1)
+    return oof_train.reshape(-1, 1), oof_val_pred.reshape(-1, 1)
 
+def cross_validate_stacking_ensemble(X, y, n_splits=5):
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    accuracy_list = []
+    auc_list = []
 
-def stacking_ensemble(X, y, X_test):
-    """
-    构建堆叠集成模型，将基模型的预测作为新特征，训练 Meta 模型。
+    all_y_true = []
+    all_y_pred = []
+    all_y_prob = []
 
-    参数：
-        X: 训练特征（DataFrame）
-        y: 训练标签（Series）
-        X_test: 测试特征（DataFrame）
+    fold = 1
+    for train_index, val_index in skf.split(X, y):
+        print(f"\n========== 外层第 {fold} 折 ==========")
+        X_train, X_val = X.iloc[train_index], X.iloc[val_index]
+        y_train, y_val = y.iloc[train_index], y.iloc[val_index]
 
-    返回：
-        final_pred: Meta 模型对测试集的最终预测结果
-        meta_model: 训练好的 Meta 模型
-    """
-    # 初始化基模型列表
-    base_models = [DNNModel(), LogisticModel(), XGBoostModel()]
-    meta_train_features = []
-    meta_test_features = []
+        base_models = [DNNModel(), LogisticModel(), XGBoostModel()]
+        meta_train_features = []
+        meta_val_features = []
 
-    # 生成每个基模型的 OOF 预测
-    for model in base_models:
-        train_pred, test_pred = get_oof_predictions(model, X, y, X_test, n_splits=5)
-        meta_train_features.append(train_pred)
-        meta_test_features.append(test_pred)
+        for model in base_models:
+            oof_train, oof_val = get_oof_predictions(model, X_train, y_train, X_val, n_splits=5)
+            meta_train_features.append(oof_train)
+            meta_val_features.append(oof_val)
 
-    # 拼接所有基模型的预测作为 Meta 层的特征矩阵
-    X_meta_train = np.hstack(meta_train_features)
-    X_meta_test = np.hstack(meta_test_features)
+        X_meta_train = np.hstack(meta_train_features)
+        X_meta_val = np.hstack(meta_val_features)
 
-    print("Meta training feature shape:", X_meta_train.shape)
-    print("Meta testing feature shape:", X_meta_test.shape)
+        meta_model = LogisticRegression()
+        meta_model.fit(X_meta_train, y_train)
+        y_val_pred = meta_model.predict(X_meta_val)
+        y_val_prob = meta_model.predict_proba(X_meta_val)[:, 1]
 
-    # 使用逻辑回归作为 Meta 模型
-    meta_model = LogisticRegression()
-    meta_model.fit(X_meta_train, y)
-    final_pred = meta_model.predict(X_meta_test)
+        acc = accuracy_score(y_val, y_val_pred)
+        auc = roc_auc_score(y_val, y_val_prob)
+        print(f"准确率: {acc:.4f}, AUC: {auc:.4f}")
+        print("分类报告:")
+        print(classification_report(y_val, y_val_pred))
 
-    return final_pred, meta_model
+        accuracy_list.append(acc)
+        auc_list.append(auc)
 
+        all_y_true.extend(y_val)
+        all_y_pred.extend(y_val_pred)
+        all_y_prob.extend(y_val_prob)
+
+        fold += 1
+
+    print("\n========== 堆叠模型交叉验证汇总 ==========")
+    print(f"平均准确率: {np.mean(accuracy_list):.4f} ± {np.std(accuracy_list):.4f}")
+    print(f"平均 AUC: {np.mean(auc_list):.4f} ± {np.std(auc_list):.4f}")
+
+    # 绘图输出到 EN_VIS_DIR
+    roc_path = EN_VIS_DIR / "ensemble_mean_roc.png"
+    cm_path = EN_VIS_DIR / "ensemble_mean_cm.png"
+
+    plot_roc_curve(all_y_true, all_y_prob, roc_path)
+    plot_confusion_matrix(all_y_true, all_y_pred, cm_path)
+
+    print(f"\nROC 曲线保存至: {roc_path}")
+    print(f"混淆矩阵保存至: {cm_path}")
 
 if __name__ == '__main__':
-    # 加载数据（请替换为您的实际数据路径）
     df = pd.read_csv(DATA_FILE)
-
-    # 分离特征与标签，确保特征名称与各模型重构时一致
     X = df.drop("hospital_death", axis=1)
     y = df["hospital_death"]
 
-    # 将数据拆分为训练集和测试集
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    # 运行堆叠集成
-    final_predictions, meta_model = stacking_ensemble(X_train, y_train, X_test)
-
-    # 输出评估结果
-    print("Stacking Ensemble Accuracy:", accuracy_score(y_test, final_predictions))
-    print("Classification Report:")
-    print(classification_report(y_test, final_predictions))
+    cross_validate_stacking_ensemble(X, y, n_splits=5)

@@ -14,7 +14,7 @@ import os
 from sklearn.metrics import classification_report, accuracy_score
 from src.visualization.plot_utils import plot_roc_curve, plot_confusion_matrix, plot_loss_curve
 from sklearn.model_selection import train_test_split
-
+from sklearn.model_selection import StratifiedKFold
 class DNNModel(BaseEstimator, ClassifierMixin):
     def __init__(self, epochs=100, batch_size=64):
         self.epochs = epochs
@@ -93,36 +93,92 @@ class DNNModel(BaseEstimator, ClassifierMixin):
 
 
 if __name__ == '__main__':
-    # 读取数据
+    # 1. 读取数据
     df = pd.read_csv(DATA_FILE)
     X = df.drop("hospital_death", axis=1)
     y = df["hospital_death"]
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    # 初始化并训练 DNN 模型
-    model = DNNModel(epochs=100, batch_size=64)
-    print("开始训练 DNN 模型...")
-    model.fit(X_train, y_train)
+    # 2. 创建目录
+    os.makedirs(DNN_VIS_DIR, exist_ok=True)
 
-    # 模型预测与评估
-    print("开始预测...")
-    y_pred = model.predict(X_test)
-    y_prob = model.predict_proba(X_test)[:, 1]
+    # 3. 设置5折交叉验证
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
-    # 准确率与报告
-    print("准确率:", accuracy_score(y_test, y_pred))
-    print("分类报告:")
-    print(classification_report(y_test, y_pred))
+    # 4. 初始化收集容器
+    all_y_true = []
+    all_y_pred = []
+    all_y_prob = []
 
-    ROC_PATH = os.path.join(DNN_VIS_DIR, "dnn_roc_curve.png")
-    CM_PATH = os.path.join(DNN_VIS_DIR, "dnn_confusion_matrix.png")
-    LOSS_PATH = os.path.join(DNN_VIS_DIR, "loss_curve.png")
+    loss_records = []
+    val_loss_records = []
 
-    plot_roc_curve(y_test, y_prob, ROC_PATH)
-    print(f"ROC 曲线已保存到: {ROC_PATH}")
+    accuracy_list = []
+    auc_list = []
 
-    plot_confusion_matrix(y_test, y_pred, CM_PATH)
+    fold = 1
+    for train_idx, test_idx in skf.split(X, y):
+        print(f"\n========== 第 {fold} 折训练 ==========")
+        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+
+        # 训练新模型
+        model = DNNModel(epochs=100, batch_size=64)
+        model.fit(X_train, y_train)
+
+        # 预测
+        y_pred = model.predict(X_test)
+        y_prob = model.predict_proba(X_test)[:, 1]
+
+        # 收集评估
+        acc = accuracy_score(y_test, y_pred)
+        auc = tf.keras.metrics.AUC()(y_test, y_prob).numpy()
+        print(f"准确率：{acc:.4f} | AUC值：{auc:.4f}")
+        print("分类报告：")
+        print(classification_report(y_test, y_pred))
+
+        all_y_true.extend(y_test)
+        all_y_pred.extend(y_pred)
+        all_y_prob.extend(y_prob)
+
+        accuracy_list.append(acc)
+        auc_list.append(auc)
+
+        loss_records.append(model.history.history['loss'])
+        val_loss_records.append(model.history.history['val_loss'])
+
+        fold += 1
+
+    # 5. 绘制结果路径
+    ROC_PATH = os.path.join(DNN_VIS_DIR, "dnn_mean_roc.png")
+    CM_PATH = os.path.join(DNN_VIS_DIR, "dnn_mean_cm.png")
+    LOSS_PATH = os.path.join(DNN_VIS_DIR, "dnn_mean_loss.png")
+
+    # 6. 绘图输出
+    plot_roc_curve(all_y_true, all_y_prob, ROC_PATH)
+    plot_confusion_matrix(all_y_true, all_y_pred, CM_PATH)
+
+    # 7. 汇总 loss 曲线（对齐长度，取最小长度）
+    min_len = min(len(loss) for loss in loss_records)
+    mean_train_loss = np.mean([loss[:min_len] for loss in loss_records], axis=0)
+    mean_val_loss = np.mean([val[:min_len] for val in val_loss_records], axis=0)
+
+
+    # 构造一个假的 history 对象用于绘图
+    class DummyHistory:
+        def __init__(self, train_loss, val_loss):
+            self.history = {
+                'loss': train_loss,
+                'val_loss': val_loss
+            }
+
+
+    dummy_history = DummyHistory(mean_train_loss, mean_val_loss)
+    plot_loss_curve(dummy_history, LOSS_PATH)
+
+    # 8. 汇总打印
+    print("\n========== 交叉验证汇总 ==========")
+    print(f"平均准确率: {np.mean(accuracy_list):.4f} ± {np.std(accuracy_list):.4f}")
+    print(f"平均 AUC: {np.mean(auc_list):.4f} ± {np.std(auc_list):.4f}")
+    print(f"\nROC 曲线已保存到: {ROC_PATH}")
     print(f"混淆矩阵图已保存到: {CM_PATH}")
-
-    plot_loss_curve(model.history, LOSS_PATH)
     print(f"Loss 曲线图已保存到: {LOSS_PATH}")
