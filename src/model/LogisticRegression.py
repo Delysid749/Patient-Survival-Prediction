@@ -67,7 +67,7 @@ class LogisticModel(BaseEstimator, ClassifierMixin):
 if __name__ == '__main__':
     # 1. 读取数据
     df = pd.read_csv(DATA_FILE)
-    X = df.drop("hospital_death", axis=1)
+    X = df[final_numerical_arr + categorical_array]
     y = df["hospital_death"]
 
     # 2. 创建可视化输出目录

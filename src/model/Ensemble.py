@@ -8,7 +8,7 @@ from src.config.path_config import DATA_FILE, LOG_DIR, EN_VIS_DIR, MODEL_DIR
 from src.visualization.plot_utils import plot_roc_curve, plot_confusion_matrix
 from pathlib import Path
 import cloudpickle
-
+from src.common.variable_array import final_numerical_arr, categorical_array
 # 导入重构后的模型
 from src.model.DNN import DNNModel
 from src.model.LogisticRegression import LogisticModel
@@ -143,7 +143,7 @@ def cross_validate_stacking_ensemble(X, y, n_splits=5):
 if __name__ == '__main__':
     # 读取训练数据
     df = pd.read_csv(DATA_FILE)
-    X = df.drop("hospital_death", axis=1)
+    X = df[final_numerical_arr + categorical_array]
     y = df["hospital_death"]
 
     # 执行 5 折交叉验证
