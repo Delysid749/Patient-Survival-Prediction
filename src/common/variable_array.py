@@ -1,0 +1,57 @@
+"""
+定义全局变量数组
+"""
+
+numerical_array = ['encounter_id', 'patient_id', 'hospital_id', 'age', 'bmi', 'elective_surgery', 'height', 'icu_id',
+                   'pre_icu_los_days',
+                   'weight', 'apache_2_diagnosis', 'apache_3j_diagnosis', 'apache_post_operative', 'arf_apache',
+                   'gcs_eyes_apache',
+                   'gcs_motor_apache', 'gcs_unable_apache', 'gcs_verbal_apache', 'heart_rate_apache',
+                   'intubated_apache', 'map_apache',
+                   'resprate_apache', 'temp_apache', 'ventilated_apache', 'd1_diasbp_max', 'd1_diasbp_min',
+                   'd1_diasbp_noninvasive_max',
+                   'd1_diasbp_noninvasive_min', 'd1_heartrate_max', 'd1_heartrate_min', 'd1_mbp_max', 'd1_mbp_min',
+                   'd1_mbp_noninvasive_max', 'd1_mbp_noninvasive_min', 'd1_resprate_max', 'd1_resprate_min',
+                   'd1_spo2_max', 'd1_spo2_min',
+                   'd1_sysbp_max', 'd1_sysbp_min', 'd1_sysbp_noninvasive_max', 'd1_sysbp_noninvasive_min',
+                   'd1_temp_max', 'd1_temp_min',
+                   'h1_diasbp_max', 'h1_diasbp_min', 'h1_diasbp_noninvasive_max', 'h1_diasbp_noninvasive_min',
+                   'h1_heartrate_max',
+                   'h1_heartrate_min', 'h1_mbp_max', 'h1_mbp_min', 'h1_mbp_noninvasive_max', 'h1_mbp_noninvasive_min',
+                   'h1_resprate_max',
+                   'h1_resprate_min', 'h1_spo2_max', 'h1_spo2_min', 'h1_sysbp_max', 'h1_sysbp_min',
+                   'h1_sysbp_noninvasive_max',
+                   'h1_sysbp_noninvasive_min', 'd1_glucose_max', 'd1_glucose_min', 'd1_potassium_max',
+                   'd1_potassium_min',
+                   'apache_4a_hospital_death_prob', 'apache_4a_icu_death_prob', 'aids', 'cirrhosis',
+                   'diabetes_mellitus',
+                   'hepatic_failure', 'immunosuppression', 'leukemia', 'lymphoma', 'solid_tumor_with_metastasis']
+
+categorical_array = ['ethnicity', 'gender', 'icu_admit_source', 'icu_stay_type', 'icu_type', 'apache_3j_bodysystem',
+                     'apache_2_bodysystem']
+
+low_num_corr_vars = [
+    'immunosuppression', 'cirrhosis', 'hepatic_failure', 'd1_glucose_min', 'leukemia', 'arf_apache',
+    'd1_resprate_min', 'd1_potassium_min', 'lymphoma', 'd1_temp_max', 'patient_id', 'aids',
+    'd1_diasbp_noninvasive_max', 'd1_diasbp_max', 'icu_id', 'hospital_id', 'd1_heartrate_min', 'encounter_id',
+    'd1_spo2_max', 'diabetes_mellitus', 'd1_mbp_noninvasive_max', 'd1_mbp_max', 'height',
+    'd1_sysbp_noninvasive_max', 'd1_sysbp_max', 'bmi', 'h1_diasbp_max', 'h1_diasbp_noninvasive_max',
+    'weight', 'map_apache', 'h1_spo2_max'
+]
+
+final_numerical_arr = [
+    'age', 'elective_surgery', 'pre_icu_los_days',
+    'apache_2_diagnosis', 'apache_3j_diagnosis', 'apache_post_operative',
+    'gcs_eyes_apache', 'gcs_motor_apache', 'gcs_unable_apache', 'gcs_verbal_apache',
+    'heart_rate_apache', 'intubated_apache', 'resprate_apache', 'temp_apache',
+    'ventilated_apache', 'd1_diasbp_min', 'd1_diasbp_noninvasive_min',
+    'd1_heartrate_max', 'd1_mbp_min', 'd1_mbp_noninvasive_min',
+    'd1_resprate_max', 'd1_spo2_min', 'd1_sysbp_min', 'd1_sysbp_noninvasive_min',
+    'd1_temp_min', 'h1_diasbp_min', 'h1_diasbp_noninvasive_min',
+    'h1_heartrate_max', 'h1_heartrate_min', 'h1_mbp_max', 'h1_mbp_min',
+    'h1_mbp_noninvasive_max', 'h1_mbp_noninvasive_min', 'h1_resprate_max',
+    'h1_resprate_min', 'h1_spo2_min', 'h1_sysbp_max', 'h1_sysbp_min',
+    'h1_sysbp_noninvasive_max', 'h1_sysbp_noninvasive_min', 'd1_glucose_max',
+    'd1_potassium_max', 'apache_4a_hospital_death_prob', 'apache_4a_icu_death_prob',
+    'solid_tumor_with_metastasis'
+]
