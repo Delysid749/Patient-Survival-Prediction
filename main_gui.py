@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox
 import pandas as pd
 import numpy as np
 import joblib
-data = pd.read_csv('dataSet/dataset.csv')
+data = pd.read_csv('dataSet/dataset_processed.csv')
 load_pipeline = joblib.load('xgb_pipeline.joblib')
 # 假设你已经训练好了这些模型，并且已经保存为joblib文件
 
@@ -15,10 +15,7 @@ joblib.dump(xgb_pipeline, 'xgb_pipeline.joblib')
 """
 # 获取相关性最高的特征
 # top_features = ['elective_surgery', 'ethnicity', 'gender', 'apache_3j_bodysystem', 'icu_admit_source']
-top_features = [
-    'apache_4a_hospital_death_prob', 'apache_4a_icu_death_prob', 'd1_spo2_min',
-    'ventilated_apache', 'd1_sysbp_noninvasive_min', 'd1_sysbp_min',
-]
+top_features = ['solid_tumor_with_metastasis', 'd1_sysbp_noninvasive_min', 'gcs_eyes_apache', 'apache_3j_diagnosis', 'apache_3j_bodysystem', 'd1_sysbp_min', 'elective_surgery', 'ventilated_apache', 'gcs_motor_apache']
 # 创建主窗口
 root = tk.Tk()
 root.title("Hospital Death Prediction")
@@ -73,9 +70,7 @@ def predict():
                     'h1_resprate_max', 'h1_resprate_min', 'h1_spo2_max', 'h1_spo2_min', 'h1_sysbp_max',
                     'h1_sysbp_min',
                     'h1_sysbp_noninvasive_max', 'h1_sysbp_noninvasive_min', 'd1_glucose_max', 'd1_glucose_min',
-                    'd1_potassium_max', 'd1_potassium_min', 'apache_4a_hospital_death_prob',
-                    'apache_4a_icu_death_prob',
-                    'aids', 'cirrhosis', 'diabetes_mellitus', 'hepatic_failure', 'immunosuppression', 'leukemia',
+                    'd1_potassium_max', 'd1_potassium_min', 'aids', 'cirrhosis', 'diabetes_mellitus', 'hepatic_failure', 'immunosuppression', 'leukemia',
                     'lymphoma', 'solid_tumor_with_metastasis', 'apache_3j_bodysystem', 'apache_2_bodysystem']
     for feature in all_features:
         if feature not in input_data:
