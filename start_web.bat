@@ -1,0 +1,1 @@
+ streamlit run .\src\patient_risk_interface.py
