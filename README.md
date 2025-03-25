@@ -1,90 +1,227 @@
-# 患者生存预测系统
 
-## 项目简介
-本项目是一个基于机器学习的患者生存预测系统，旨在通过分析患者的各项生理指标和临床数据，预测患者在ICU中的生存情况。该系统可以帮助医疗团队更好地评估患者风险，制定更有效的治疗方案。
 
-## 主要功能
-- 患者数据分析和可视化
-- 多维度特征相关性分析
-- 机器学习模型训练和预测
-- 交互式Web界面
-- 实时风险评估
+🏥 Patient Survival Prediction System
+=====================================
 
-## 技术栈
-- Python 3.x
-- 机器学习库：scikit-learn, pandas, numpy
-- Web框架：Flask
-- 数据可视化：matplotlib, seaborn
-- 数据处理：pandas, numpy
+This project aims to predict in-hospital mortality risk for ICU patients using machine learning models. It provides a full pipeline from preprocessing, correlation analysis, model training, ensemble learning, visualization, and a user-friendly GUI for real-time clinical prediction.
 
-## 项目结构
+* * *
+
+🎯 Project Objectives
+---------------------
+
+*   Build an ensemble model to predict hospital mortality risk
+    
+*   Extract critical features from patient records and ICU monitoring
+    
+*   Design a usable prediction interface for clinical settings
+    
+*   Provide structured results and insights to support decision-making
+    
+* * *
+
+📁 Project Structure
+--------------------
+
 ```
-├── src/                    # 源代码目录
-│   ├── app.py             # Web应用主入口
-│   ├── patient_risk_interface.py  # 患者风险评估接口
-│   ├── visualization/     # 数据可视化模块
-│   ├── model/            # 机器学习模型
-│   ├── config/           # 配置文件
-│   ├── common/           # 公共工具函数
-│   ├── correlation_analysis/  # 相关性分析模块
-│   └── notebook/         # Jupyter notebooks
-├── dataSet/              # 数据集目录
-├── Model/                # 训练好的模型存储
-├── report/              # 项目报告和文档
-└── requirements.txt     # 项目依赖
+Patient–Survival–Prediction/
+│
+├── dataSet/
+│   └── dataset.csv                # Raw patient-level data (CSV)
+│
+├── Model/                         # Saved models
+│   ├── base_models.pkl            # Trained base models (XGB, DNN, LR)
+│   └── meta_model.pkl            # Trained stacking meta-model
+│
+├── report/
+│   └── logs/
+│       ├── categorical_correlation.log
+│       └── numerical_correlation.log
+│
+├── src/
+│   ├── common/
+│   │   └── variable_array.py     # Predefined categorical/numerical feature lists
+│
+│   ├── config/
+│   │   └── path_config.py        # Path manager for logs, data, and models
+│
+│   ├── correlation_analysis/
+│   │   ├── categorical_analysis.py   # Categorical feature correlation (e.g., Cramer’s V)
+│   │   └── numerical_analysis.py     # Numerical feature correlation (e.g., Pearson)
+│
+│   ├── model/
+│   │   ├── DNN.py                # Keras-based deep neural network
+│   │   ├── Ensemble.py           # Stacking & Soft Voting ensemble logic
+│   │   ├── LogisticRegression.py # Scikit-learn logistic regression
+│   │   └── Xgboost.py            # XGBoost tree model
+│
+│   ├── notebook/
+│   │   └── EDA.ipynb             # Exploratory Data Analysis notebook
+│
+│   └── visualization/
+│       ├── DNN/
+│       ├── Ensemble/
+│       ├── LogisticRegression/
+│       ├── XgBoost/
+│       └── plot_utils.py         # Utility functions for plotting
+│
+├── patient_risk_interface.py     # GUI for real-time mortality risk prediction
+│
+├── col_description.md            # Complete data dictionary (in Chinese)
+├── requirements.txt              # Python dependency list
+├── README.md                     # Project documentation (this file)
+├── .gitignore                    # Git ignore config
+└── .venv/                        # Local Python virtual environment
 ```
 
-## 数据特征
-系统使用的主要特征包括：
-- 患者基本信息（年龄、性别、BMI等）
-- 生命体征数据（心率、血压、体温等）
-- 实验室检查结果
-- APACHE评分相关指标
-- ICU相关指标
+* * *
 
-## 安装说明
-1. 克隆项目到本地
+📊 Dataset Description
+----------------------
+
+The dataset originates from a Kaggle ICU mortality prediction dataset. Full feature descriptions are in `col_description.md`. Key data types:
+
+*   **Demographics**: Age, gender, ethnicity, height, weight, BMI
+*   **ICU Info**: Admission source, ICU type, stay type
+*   **Vitals**: Heart rate, blood pressure, temperature, oxygen saturation
+*   **Scores**: GCS (eye, motor, verbal), APACHE II & III scores
+*   **Comorbidities**: Diabetes, liver failure, AIDS, leukemia, cancer
+*   **Target variable**: `hospital_death` (1=death, 0=survival)
+
+💡 Models Implemented
+---------------------
+
+| Model | File | Description |
+| --- | --- | --- |
+| Logistic Regression | `LogisticRegression.py` | Linear baseline classifier |
+| XGBoost | `Xgboost.py` | Gradient boosting decision trees |
+| DNN | `DNN.py` | Multi-layer perceptron (MLP) |
+| Stacking Ensemble | `Ensemble.py` | Combines DNN, LR, XGB via meta-learner |
+| Soft Voting | `Ensemble.py` | Weighted average of predicted probabilities |
+
+* * *
+
+⚙️ Setup & Installation
+-----------------------
+
+### Step 1: Create virtual environment
+
 ```bash
-git clone [项目地址]
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 ```
 
-2. 创建并激活虚拟环境
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# 或
-.venv\Scripts\activate  # Windows
-```
+### Step 2: Install dependencies
 
-3. 安装依赖
 ```bash
 pip install -r requirements.txt
 ```
 
-## 使用说明
-1. 启动Web应用
+* * *
+
+🚀 Running Instructions
+-----------------------
+
+### 📌 1. Run correlation analysis
+
 ```bash
-python src/app.py
+python src/correlation_analysis/categorical_analysis.py
+python src/correlation_analysis/numerical_analysis.py
 ```
 
-2. 访问系统
-打开浏览器访问 `http://localhost:5000`
+### 📌 2. Explore data (optional)
 
-3. 使用预测功能
-- 在Web界面输入患者信息
-- 系统将自动进行风险评估
-- 查看预测结果和详细分析报告
+Open `notebook/EDA.ipynb` to explore missing values, distributions, etc.
 
-## 模型说明
-系统使用多个机器学习模型进行预测：
-- 随机森林
-- XGBoost
-- LightGBM
-- 逻辑回归
+* * *
 
-## 注意事项
-- 确保数据格式符合要求
-- 定期更新模型
-- 注意数据安全性
-- 遵循医疗数据使用规范
+### 📌 3. Train individual models
 
+```bash
+python src/model/Xgboost.py
+python src/model/LogisticRegression.py
+python src/model/DNN.py
+```
+
+Outputs:
+
+*   Model files saved in `Model/`
+*   Visualization saved in `visualization/`
+    
+
+### 📌 4. Train ensemble model
+
+```bash
+python src/model/Ensemble.py
+```
+
+This will:
+
+*   Perform 5-fold cross-validation
+*   Save base and meta models
+*   Output ensemble metrics
+    
+
+### 📌 5. Run GUI interface
+
+```bash
+streamlit patient_risk_interface.py
+```
+
+GUI Features:
+
+*   Input patient features
+*   Click “Predict”
+*   View mortality risk (0–1 probability)
+    
+
+📈 Visualizations
+-----------------
+
+Generated plots are saved under `visualization/`:
+
+*   Confusion Matrix
+*   ROC Curves
+*   F1 Score comparison
+*   Feature Importance bar charts
+    
+
+🧰 Requirements
+---------------
+
+```txt
+numpy
+pandas
+scikit-learn
+xgboost
+tensorflow
+keras
+matplotlib
+seaborn
+joblib
+tkinter
+```
+
+Install all via:
+
+```bash
+pip install -r requirements.txt
+```
+
+* * *
+
+🧠 Highlights
+-------------
+
+*   ✅ Modular, clean architecture
+*   ✅ Reusable scripts for training & testing
+*   ✅ Real-time risk prediction UI
+*   ✅ Transparent feature documentation
+*   ✅ Log files to trace analysis steps
+    
+
+🧑‍💻 Authors & Credits
+-----------------------
+
+> Group Project from **\[LingNan University\]**  
+> Group Members: Yao HaoYang,Fang Zhou,Chen ZheHan,Liu ZhenTao,Yang Chuang,Xie Jie
