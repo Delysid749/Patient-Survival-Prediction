@@ -1,4 +1,4 @@
-
+中文README见[README_CN.md](./README_CN.md)
 
 🏥 Patient Survival Prediction System
 =====================================
